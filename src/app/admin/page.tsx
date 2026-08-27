@@ -125,7 +125,7 @@ export default function AdminPage() {
         supabase.from("profiles").select("id,nickname,job_role,career_band,teacher_started_year,is_verified,created_at,user_sanctions(kind,reason,ends_at,created_at)").order("created_at", { ascending: false }).limit(100),
         supabase.from("teacher_verification_requests").select("id,user_id,method,document_path,status,rejection_reason,reviewed_at,created_at,profiles(nickname,job_role,career_band,teacher_started_year)").order("created_at", { ascending: false }),
         supabase.from("profiles").select("id,nickname,job_role,teacher_started_year,is_verified,verification_revoked_at,verification_revoke_reason,created_at").or("is_verified.eq.true,teacher_started_year.not.is.null").order("updated_at", { ascending: false }),
-        supabase.from("workplace_reviews").select("id,facility_name,region,facility_type,worked_from,worked_until,peer_relationship,workload,leave_policy,rating,body,status,rejection_reason,reviewed_at,created_at,profiles(nickname)").order("created_at", { ascending: false }),
+        supabase.rpc("admin_list_workplace_reviews"),
         supabase.from("facilities").select("id,owner_id,name,business_number,region,document_path,status,rejection_reason,reviewed_at,created_at,profiles(nickname)").order("created_at", { ascending: false }),
         supabase.from("announcements").select("id,title,body,image_path,is_published,created_at,updated_at").order("created_at", { ascending: false }),
         supabase.from("faqs").select("id,category,question,answer,sort_order,is_published,created_at,updated_at").order("sort_order").order("created_at", { ascending: false }),
@@ -140,7 +140,10 @@ export default function AdminPage() {
       const certifiedRows = (certifiedResult.data ?? []) as CertifiedTeacher[];
       setCertifiedTeachers(certifiedRows);
       setCertifiedDrafts(Object.fromEntries(certifiedRows.map((teacher) => [teacher.id, { job_role: teacher.job_role ?? "childcare_teacher", started_year: teacher.teacher_started_year ?? currentYear }])));
-      setWorkplaceReviews((reviewResult.data ?? []) as unknown as WorkplaceReview[]);
+      const reviewRows = reviewResult.error
+        ? (await supabase.from("workplace_reviews").select("id,facility_name,region,facility_type,worked_from,worked_until,peer_relationship,workload,leave_policy,rating,body,status,rejection_reason,reviewed_at,created_at").order("created_at", { ascending: false })).data
+        : reviewResult.data;
+      setWorkplaceReviews((reviewRows ?? []) as unknown as WorkplaceReview[]);
       setFacilityRequests((facilityResult.data ?? []) as unknown as FacilityRequest[]);
       const announcementRows = (announcementResult.data ?? []) as Announcement[];
       setAnnouncements(await Promise.all(announcementRows.map(async (item) => item.image_path ? { ...item, image_url: (await supabase.storage.from("announcement-images").createSignedUrl(item.image_path, 300)).data?.signedUrl } : item)));

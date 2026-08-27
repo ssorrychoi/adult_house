@@ -117,6 +117,16 @@ type JobListing = {
   closes_at: string | null;
   created_at: string;
 };
+
+type ChildcareCenter = {
+  id: number;
+  name: string;
+  sido: string;
+  sigungu: string;
+  facility_type: string;
+  operation_status: string;
+  address: string;
+};
 type TrendingPost = {
   post_id: number;
   author_id: string;
@@ -1824,6 +1834,13 @@ function CareerScreen({ tab, setTab, flash, go, user }: { tab: "jobs" | "reviews
     }>
   >([]);
   const [canViewReviews, setCanViewReviews] = useState(false);
+  const [centers, setCenters] = useState<ChildcareCenter[]>([]);
+  const [centerSearch, setCenterSearch] = useState("");
+  const [centerQuery, setCenterQuery] = useState("");
+  const [centerRegion, setCenterRegion] = useState("all");
+  const [centerPage, setCenterPage] = useState(0);
+  const [centerCount, setCenterCount] = useState(0);
+  const [centersLoading, setCentersLoading] = useState(false);
   useEffect(() => {
     if (tab === "reviews") {
       if (!user) {
@@ -1851,6 +1868,19 @@ function CareerScreen({ tab, setTab, flash, go, user }: { tab: "jobs" | "reviews
         .order("created_at", { ascending: false })
         .then(({ data }) => setJobs((data ?? []) as JobListing[]));
   }, [supabase, tab, user]);
+  useEffect(() => {
+    if (tab !== "reviews") return;
+    void (async () => {
+      setCentersLoading(true);
+      let query = supabase.from("childcare_centers").select("id,name,sido,sigungu,facility_type,operation_status,address", { count: "exact" }).eq("operation_status", "정상").order("name").range(centerPage * 30, centerPage * 30 + 29);
+      if (centerRegion !== "all") query = query.eq("sido", centerRegion);
+      if (centerQuery) query = query.or(`name.ilike.%${centerQuery}%,address.ilike.%${centerQuery}%`);
+      const { data, count } = await query;
+      setCenters((data ?? []) as ChildcareCenter[]);
+      setCenterCount(count ?? 0);
+      setCentersLoading(false);
+    })();
+  }, [centerPage, centerQuery, centerRegion, supabase, tab]);
   useEffect(() => {
     if (user)
       supabase
@@ -2036,25 +2066,34 @@ function CareerScreen({ tab, setTab, flash, go, user }: { tab: "jobs" | "reviews
         </>
       ) : (
         <section className="career-list review-list">
-          <div className="privacy">🛡 인증한 선생님만 후기를 확인할 수 있어요. 작성자 정보는 공개하지 않습니다.</div>
-          {canViewReviews ? (
-            facilityGroups.map((facility) => (
-              <article className="review facility-review-card" key={`${facility.region}-${facility.facilityName}`} onClick={() => router.push(`/reviews/facilities/${facility.seedId}`)}>
+          <form className="center-search" onSubmit={(event) => { event.preventDefault(); setCenterPage(0); setCenterQuery(centerSearch.trim()); }}>
+            <input value={centerSearch} onChange={(event) => setCenterSearch(event.target.value)} placeholder="어린이집 이름이나 주소를 검색해 보세요" aria-label="어린이집 검색" />
+            <select value={centerRegion} onChange={(event) => { setCenterRegion(event.target.value); setCenterPage(0); }} aria-label="시도 선택">
+              <option value="all">전국</option>
+              {["서울특별시", "부산광역시", "대구광역시", "인천광역시", "광주광역시", "대전광역시", "울산광역시", "세종특별자치시", "경기도", "강원특별자치도", "충청북도", "충청남도", "전북특별자치도", "전라남도", "경상북도", "경상남도", "제주특별자치도"].map((item) => <option key={item}>{item}</option>)}
+            </select>
+            <button className="primary">검색</button>
+          </form>
+          <div className="center-list-summary"><strong>전국 어린이집</strong><span>{centerCount.toLocaleString("ko-KR")}곳</span></div>
+          <div className="privacy">🛡 어린이집 목록은 누구나 볼 수 있고, 후기 내용은 인증한 선생님만 확인할 수 있어요.</div>
+          {centersLoading ? <div className="empty"><strong>어린이집을 불러오고 있어요</strong></div> : centers.map((center) => {
+            const facility = facilityGroups.find((item) => item.facilityName.trim().toLowerCase() === center.name.trim().toLowerCase() && `${center.sido} ${center.sigungu}`.includes(item.region));
+            return (
+              <article className="review facility-review-card" key={center.id} onClick={() => facility ? router.push(`/reviews/facilities/${facility.seedId}`) : flash("아직 등록된 후기가 없는 어린이집이에요")}>
                 <header>
                   <div>
                     <span className="review-location">
-                      {facility.region} · {facility.facilityType}
+                      {center.sido} {center.sigungu} · {center.facility_type}
                     </span>
-                    <h3>{facility.facilityName}</h3>
+                    <h3>{center.name}</h3>
+                    <p>{center.address}</p>
                   </div>
-                  <span className="review-rating">
-                    <small>평균</small>★ {facility.rating.toFixed(1)}
-                  </span>
+                  {facility && canViewReviews && <span className="review-rating"><small>평균</small>★ {facility.rating.toFixed(1)}</span>}
                 </header>
                 <div className="review-meta">
-                  <span>✓ 인증 후기 {facility.count}개</span>
+                  <span>{facility ? `✓ 인증 후기 ${facility.count}개` : "등록된 후기 없음"}</span>
                 </div>
-                <div className="review-scores">
+                {facility && canViewReviews && <div className="review-scores">
                   <b>
                     동료 관계<strong>{facility.peer.toFixed(1)}</strong>
                   </b>
@@ -2064,56 +2103,22 @@ function CareerScreen({ tab, setTab, flash, go, user }: { tab: "jobs" | "reviews
                   <b>
                     휴게·연차<strong>{facility.leave.toFixed(1)}</strong>
                   </b>
-                </div>
+                </div>}
                 <footer>
-                  어린이집 후기 모아보기 <span>›</span>
+                  {facility ? "어린이집 후기 모아보기" : "첫 후기를 기다리고 있어요"} <span>›</span>
                 </footer>
               </article>
-            ))
-          ) : (
-            <div className="review-lock">
-              <div className="review-blur" aria-hidden="true">
-                {[1, 2].map((item) => (
-                  <article className="review" key={item}>
-                    <header>
-                      <div>
-                        <span className="review-location">서울 · 어린이집</span>
-                        <h3>인증 선생님 전용 근무 후기</h3>
-                      </div>
-                      <span className="review-rating">★ 5.0</span>
-                    </header>
-                    <div className="review-scores">
-                      <b>
-                        동료 관계<strong>5</strong>
-                      </b>
-                      <b>
-                        업무 환경<strong>5</strong>
-                      </b>
-                      <b>
-                        휴게·연차<strong>5</strong>
-                      </b>
-                    </div>
-                    <p>근무 환경과 실제 경험에 대한 솔직한 후기입니다.</p>
-                  </article>
-                ))}
-              </div>
-              <div className="review-lock-message">
-                <span>🪪</span>
-                <strong>{user ? "선생님 인증이 필요해요" : "로그인과 선생님 인증이 필요해요"}</strong>
-                <p>인증된 선생님끼리만 안전하게 근무 경험을 나눠요.</p>
-                <button className="primary" onClick={() => go(user ? "verification" : "login")}>
-                  {user ? "선생님 인증하기" : "로그인하기"}
-                </button>
-              </div>
-            </div>
-          )}
-          {canViewReviews && reviews.length === 0 && (
+            );
+          })}
+          {!centersLoading && centers.length === 0 && (
             <div className="empty">
               <span>🌱</span>
-              <strong>승인된 후기가 아직 없어요</strong>
-              <p>첫 번째 경험을 기다리고 있어요.</p>
+              <strong>검색 결과가 없어요</strong>
+              <p>어린이집 이름이나 지역을 다시 확인해 주세요.</p>
             </div>
           )}
+          {centerCount > 30 && <div className="center-pagination"><button disabled={centerPage === 0} onClick={() => setCenterPage((page) => page - 1)}>이전</button><span>{centerPage + 1} / {Math.ceil(centerCount / 30)}</span><button disabled={(centerPage + 1) * 30 >= centerCount} onClick={() => setCenterPage((page) => page + 1)}>다음</button></div>}
+          <small className="data-source">출처: 한국사회보장정보원 어린이집정보공개포털 · 공공누리 제1유형</small>
         </section>
       )}
       <button className="floating-write" onClick={() => (tab === "reviews" ? go("review-write") : router.push("/recruiter"))}>
@@ -3582,8 +3587,14 @@ function LoginScreen({ supabase, flash }: { supabase: ReturnType<typeof createCl
         </p>
       </div>
       <div>
-        <button disabled={loading} onClick={login}>
-          G　{loading ? "Google로 이동 중..." : "Google로 계속하기"}
+        <button className="google-login-button" disabled={loading} onClick={login}>
+          <svg className="google-logo" viewBox="0 0 18 18" aria-hidden="true">
+            <path fill="#EA4335" d="M17.64 9.205c0-.638-.057-1.252-.164-1.841H9v3.481h4.844a4.14 4.14 0 0 1-1.797 2.715v2.258h2.909c1.702-1.567 2.684-3.876 2.684-6.613Z" />
+            <path fill="#4285F4" d="M9 18c2.43 0 4.468-.806 5.956-2.182l-2.909-2.258c-.806.54-1.835.859-3.047.859-2.344 0-4.329-1.585-5.037-3.714H.956v2.332A9 9 0 0 0 9 18Z" />
+            <path fill="#FBBC05" d="M3.963 10.705A5.41 5.41 0 0 1 3.682 9c0-.592.102-1.168.281-1.705V4.963H.956A9 9 0 0 0 0 9c0 1.452.347 2.827.956 4.037l3.007-2.332Z" />
+            <path fill="#34A853" d="M9 3.58c1.321 0 2.507.454 3.441 1.345l2.581-2.582A8.65 8.65 0 0 0 9 0 9 9 0 0 0 .956 4.963l3.007 2.332C4.671 5.166 6.656 3.58 9 3.58Z" />
+          </svg>
+          {loading ? "Google로 이동 중..." : "Google로 계속하기"}
         </button>
         <small>계속하면 이용약관 및 개인정보 처리방침에 동의하게 됩니다.</small>
       </div>

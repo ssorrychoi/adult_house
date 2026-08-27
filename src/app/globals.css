@@ -2064,6 +2064,48 @@ button {
 .facility-review-card {
   min-height: 182px;
 }
+.center-search {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 170px auto;
+  gap: 8px;
+}
+.center-search input,
+.center-search select {
+  min-width: 0;
+  padding: 13px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper);
+}
+.center-list-summary,
+.center-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.center-list-summary span,
+.data-source {
+  color: var(--muted);
+}
+.center-pagination {
+  justify-content: center;
+}
+.center-pagination button {
+  padding: 9px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+}
+.facility-review-card header p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+@media (max-width: 640px) {
+  .center-search { grid-template-columns: 1fr auto; }
+  .center-search input { grid-column: 1 / -1; }
+}
 .facility-review-detail {
   padding: 20px 22px 105px;
 }
@@ -2461,6 +2503,40 @@ button {
   border: 1px solid var(--line);
   border-radius: 15px;
   background: var(--paper);
+}
+.login .google-login-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 0 12px;
+  border: 1px solid #747775;
+  background: #fff;
+  color: #1f1f1f;
+  box-shadow: none;
+  font-family: "Google Sans", Roboto, Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+}
+.google-logo {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+}
+.login .google-login-button:hover {
+  background: #f8faff;
+  box-shadow: 0 1px 2px rgb(60 64 67 / 30%);
+}
+.login .google-login-button:active {
+  transform: none;
+  background: #eef3fe;
+  box-shadow: none;
+}
+.login .google-login-button:disabled {
+  cursor: wait;
+  opacity: 0.65;
 }
 .login small {
   color: var(--muted);
